@@ -1,0 +1,63 @@
+func main2() {
+	tc, err := tlscfg()
+	if err != nil {
+		fmt.Println("tlscfg error msg", err)
+		return
+	}
+	qls, err := quic.ListenAddr(":443", tc, nil)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	session, err := qls.Accept(ctx)
+	if err != nil {
+		fmt.Println("qls.Accept()", err)
+		return
+	}
+	// 携程处理
+	for {
+		go hander(session)
+	}
+}
+
+// tls 加密配置 必须
+func tlscfg() (tc *tls.Config, err error) {
+	cert, err := tls.LoadX509KeyPair("./../CSR/2822297_iuu.pub.pem", "./../CSR/2822297_iuu.pub.key")
+	if err != nil {
+		return
+	}
+	tc = &tls.Config{Certificates: []tls.Certificate{cert}}
+	return
+}
+
+type loggingWriter struct{ io.Writer }
+
+func (w loggingWriter) Write(b []byte) (int, error) {
+	fmt.Printf("Server: Got '%s'\n", string(b))
+	return w.Writer.Write(b)
+}
+
+func hander(se quic.Session) {
+	// 接收流
+	stream, err := se.AcceptStream(ctx)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	for {
+		_, err = io.Copy(loggingWriter{stream}, stream)
+	}
+	/*
+		out, err := os.Create("img1.mp3")
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		defer out.Close()
+		_, err = io.Copy(out, stream)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+	*/
+}
